@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Extracción de Entropía E0-E4 | Q32.32 ESP32-S3</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0f172a; --panel2:#1e293b; --border:#334155; --border2:#475569;
+    --text:#f8fafc; --dim:#94a3b8; --dim2:#64748b;
+    --mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Arial, sans-serif;
+    --e0:#eab308; --e0-bg:rgba(234,179,8,.12);
+    --e1:#10b981; --e1-bg:rgba(16,185,129,.12);
+    --e2:#ef4444; --e2-bg:rgba(239,68,68,.15);
+    --e3:#38bdf8; --e3-bg:rgba(56,189,248,.12);
+    --e4:#fbbf24; --e4-bg:rgba(251,191,36,.12);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  header.top{
+    position:sticky; top:0; z-index:50; background:rgba(7,11,22,.94); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border); padding:12px 24px;
+  }
+  .topwrap{display:flex; align-items:center; justify-content:space-between; max-width:1160px; margin:0 auto; flex-wrap:wrap; gap:12px}
+  .brand{font-family:var(--mono); font-size:13px; color:var(--dim); font-weight:bold}
+  nav.tabs{display:flex; gap:6px; flex-wrap:wrap}
+  nav.tabs a{
+    font-family:var(--mono); font-size:12px; color:var(--dim); text-decoration:none;
+    padding:6px 12px; border-radius:6px; border:1px solid transparent; transition:0.2s;
+  }
+  nav.tabs a:hover{border-color:var(--border2); color:var(--text); background:var(--panel2)}
+  main{max-width:1160px; margin:0 auto; padding:30px 24px 80px}
+  .intro{padding-bottom:24px; border-bottom:1px solid var(--border); margin-bottom:36px}
+  .intro h1{font-size:24px; font-weight:700; margin:0 0 8px}
+  .intro p{color:var(--dim); font-size:14px; margin:0}
+  section.method{margin-bottom:64px; scroll-margin-top:70px}
+  .eyebrow{
+    font-family:var(--mono); font-size:11.5px; font-weight:bold; letter-spacing:.03em; display:inline-flex;
+    align-items:center; gap:8px; padding:4px 10px; border-radius:5px; margin-bottom:12px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%}
+  h2.mtitle{font-size:20px; font-weight:700; margin:0 0 4px}
+  .note{font-size:13px; color:var(--dim2); margin:0 0 14px}
+  .formula{
+    font-family:var(--mono); font-size:15px; background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:12px 16px; margin:0 0 16px; overflow-x:auto; white-space:nowrap;
+  }
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:22px}
+  .rowhead{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px}
+  .formulaval{font-family:var(--mono); font-size:13px; color:var(--dim)}
+  .btnrow{display:flex; gap:8px}
+  button{
+    font-family:var(--mono); font-size:12px; font-weight:600; color:var(--text); background:var(--panel2);
+    border:1px solid var(--border2); border-radius:5px; padding:7px 15px; cursor:pointer; transition:0.2s;
+  }
+  button:hover{background:#2a384c; border-color:#38bdf8}
+  .reglabel{font-size:11px; color:var(--dim2); font-family:var(--mono); margin-bottom:6px; display:flex; justify-content:space-between}
+  .register{display:grid; grid-template-columns:repeat(8, 1fr); gap:6px; margin-bottom:14px}
+  .byte{
+    font-family:var(--mono); font-size:13px; height:50px; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; border-radius:6px;
+    border:1px solid var(--border); background:var(--panel2); transition:all .3s ease;
+  }
+  .byte .idx{font-size:9px; color:var(--dim2); margin-bottom:2px}
+  .byte .hex{font-weight:700}
+  
+  /* Cajas de Procedimiento Matemático */
+  .math-card{
+    background:#0b1120; border:1px solid var(--border); border-radius:6px; padding:16px;
+    margin:14px 0; font-family:var(--mono); font-size:12.5px;
+  }
+  .math-step{margin-bottom:8px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+  .math-step:last-child{margin-bottom:0}
+  .step-num{color:var(--dim2); font-size:11px; width:18px; flex-shrink:0}
+  .step-lbl{color:var(--dim); width:210px; flex-shrink:0}
+  .step-val{color:#38bdf8; font-weight:600}
+  
+  .bit-stream-row{display:flex; align-items:center; gap:8px; margin-bottom:6px; overflow-x:auto}
+  .bit-stream-label{width:130px; font-size:11px; color:var(--dim2); flex-shrink:0}
+  .bit-cells{display:flex; gap:3px}
+  .bit-cell{
+    width:24px; height:28px; display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--border2); border-radius:3px; background:var(--panel2); font-weight:700; font-family:var(--mono);
+  }
+  .bit-cell.active-hi{background:#047857; border-color:#10b981; color:#fff}
+  .bit-cell.active-err{background:#7f1d1d; border-color:#ef4444; color:#fff}
+  .bit-cell.dim{opacity:0.35}
+
+  .result{display:flex; align-items:center; gap:16px; margin-top:16px; flex-wrap:wrap}
+  .resultbyte{
+    font-family:var(--mono); font-size:20px; font-weight:700; width:95px; height:50px;
+    display:flex; align-items:center; justify-content:center; border-radius:6px; border:2px solid;
+  }
+  .status-badge{font-size:11px; font-family:var(--mono); padding:3px 8px; border-radius:4px; font-weight:bold}
+  .badge-pass{background:#064e3b; color:#34d399; border:1px solid #10b981}
+  .badge-fail{background:#450a0a; color:#fca5a5; border:1px solid #ef4444}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topwrap">
+    <span class="brand">ESP32-S3 / Q32.32 / RK4 / EXTRACTORES E0 - E4</span>
+    <nav class="tabs">
+      <a href="#e0">E0: Decimal</a><a href="#e1">E1: LSB</a><a href="#e2">E2: Frac Alta</a><a href="#e3">E3: XOR-64</a><a href="#e4">E4: Mezcla 3D</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <h1>Operaciones Matemáticas y Extracción de Entropía</h1>
+    <p>Desglose algebraico y lógico del vector de estado tridimensional hacia el byte de salida <i>K</i><sub><i>n</i></sub>.</p>
+  </div>
+
+  <!-- ================= E0 ================= -->
+  <section class="method" id="e0">
+    <span class="eyebrow" style="background:var(--e0-bg); color:var(--e0)"><span class="dot" style="background:var(--e0)"></span>E0: Baseline Decimal</span>
+    <h2 class="mtitle">Desplazamiento Decimal 10¹³, Truncamiento y Módulo 256</h2>
+    <p class="note">Aritmética decimal convencional calculada a partir del valor real de <i>X</i><sub><i>n</i></sub>.</p>
+    <div class="formula"><i>K</i><sub><i>n</i></sub> = floor( |<i>X</i><sub><i>n</i></sub>| &times; 10<sup>13</sup> ) mod 256</div>
+    
+    <div class="panel">
+      <div class="rowhead">
+        <span class="formulaval" id="e0-val">Estado analógico <i>X</i><sub><i>n</i></sub>: calculando...</span>
+        <div class="btnrow">
+          <button onclick="E0.play()">Calcular Operación</button>
+          <button onclick="E0.newVal()">Nuevo <i>X</i><sub><i>n</i></sub></button>
+        </div>
+      </div>
+
+      <div class="math-card">
+        <div class="math-step">
+          <span class="step-num">1.</span>
+          <span class="step-lbl">Valor absoluto |<i>X</i><sub><i>n</i></sub>|:</span>
+          <span class="step-val" id="e0-m1">-</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">2.</span>
+          <span class="step-lbl">Escalamiento &times; 10¹³:</span>
+          <span class="step-val" id="e0-m2" style="color:var(--e0)">-</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">3.</span>
+          <span class="step-lbl">Parte entera floor():</span>
+          <span class="step-val" id="e0-m3" style="color:#a855f7">-</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">4.</span>
+          <span class="step-lbl">Módulo 256 (% 256):</span>
+          <span class="step-val" id="e0-m4" style="color:#34d399">-</span>
+        </div>
+      </div>
+
+      <div class="result">
+        <div class="resultbyte" id="e0-res" style="border-color:var(--e0); color:var(--e0)">-</div>
+        <div class="bit-cells" id="e0-bits"></div>
+        <span class="status-badge badge-pass">PASA NIST (0 fallas / 188)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= E1 ================= -->
+  <section class="method" id="e1">
+    <span class="eyebrow" style="background:var(--e1-bg); color:var(--e1)"><span class="dot" style="background:var(--e1)"></span>E1: Bits 0..7 de <i>X</i><sub><i>n</i></sub> (LSB)</span>
+    <h2 class="mtitle">Aislamiento Lógico del Octeto Menos Significativo de la Fracción</h2>
+    <p class="note">Aislamiento por máscara binaria sobre el registro entero de 64 bits en 1 ciclo de CPU.</p>
+    <div class="formula"><i>K</i><sub><i>n</i></sub> = <i>X</i><sub><i>n</i></sub> &amp; 0xFF</div>
+
+    <div class="panel">
+      <div class="rowhead">
+        <span class="formulaval" id="e1-val"><i>X</i><sub><i>n</i></sub>: -</span>
+        <div class="btnrow">
+          <button onclick="E1.play()">Ejecutar Máscara</button>
+          <button onclick="E1.newVal()">Nuevo <i>X</i><sub><i>n</i></sub></button>
+        </div>
+      </div>
+
+      <div class="reglabel"><span>Bits 63..32: Parte Entera</span><span>Bits 31..0: Parte Fraccionaria</span></div>
+      <div class="register" id="e1-reg"></div>
+
+      <div class="math-card">
+        <div class="math-step">
+          <span class="step-num">1.</span>
+          <span class="step-lbl">Palabra Q32.32 (64 bits):</span>
+          <span class="step-val" id="e1-m1" style="font-size:11.5px">-</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">2.</span>
+          <span class="step-lbl">Operación a nivel de bits:</span>
+          <span class="step-val" id="e1-m2"><i>X</i><sub><i>n</i></sub> AND 0x00000000000000FF</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">3.</span>
+          <span class="step-lbl">Resolución cuántica LSB:</span>
+          <span class="step-val" style="color:var(--e1)">2⁻²⁵ a 2⁻³² (&asymp; 2.98&times;10⁻⁸ a 2.32&times;10⁻¹⁰)</span>
+        </div>
+      </div>
+
+      <div class="anim-box" style="margin-top:10px">
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Byte 0 de <i>X</i><sub><i>n</i></sub>:</div>
+          <div class="bit-cells" id="e1-src-bits"></div>
+        </div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Máscara (0xFF):</div>
+          <div class="bit-cells" id="e1-mask-bits"></div>
+        </div>
+        <div style="height:1px; background:var(--border); margin:6px 0"></div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Resultado <i>K</i><sub><i>n</i></sub>:</div>
+          <div class="bit-cells" id="e1-out-bits"></div>
+        </div>
+      </div>
+
+      <div class="result">
+        <div class="resultbyte" id="e1-res" style="border-color:var(--e1); color:var(--e1)">-</div>
+        <span class="status-badge badge-pass">PASA NIST (186-188 / 188)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= E2 ================= -->
+  <section class="method" id="e2">
+    <span class="eyebrow" style="background:var(--e2-bg); color:var(--e2)"><span class="dot" style="background:var(--e2)"></span>E2: Bits 24..31 de <i>X</i><sub><i>n</i></sub> (Fracción Alta)</span>
+    <h2 class="mtitle">Desplazamiento Lógico y Demostración de Persistencia Temporal</h2>
+    <p class="note">Muestra la memoria determinista entre pasos de integración consecutivos con h &approx; 0.01.</p>
+    <div class="formula"><i>K</i><sub><i>n</i></sub> = ( <i>X</i><sub><i>n</i></sub> &gt;&gt; 24 ) &amp; 0xFF</div>
+
+    <div class="panel">
+      <div class="rowhead">
+        <span class="formulaval" id="e2-val">Comparación temporal: -</span>
+        <div class="btnrow">
+          <button onclick="E2.play()">Analizar Pasos Consecutivos</button>
+          <button onclick="E2.newVal()">Nuevo <i>X</i><sub><i>n</i></sub></button>
+        </div>
+      </div>
+
+      <div class="reglabel"><span>B7 (Signo)</span><span>B3 (Bits 31..24) &lt;-- Fracción Alta</span><span>B0 (LSB)</span></div>
+      <div class="register" id="e2-reg"></div>
+
+      <div class="math-card">
+        <div class="math-step">
+          <span class="step-num">1.</span>
+          <span class="step-lbl">Operación matemática:</span>
+          <span class="step-val">Desplazamiento aritmético 24 bits a la derecha + AND 0xFF</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">2.</span>
+          <span class="step-lbl">Rango de pesos:</span>
+          <span class="step-val" style="color:#f87171">2⁻¹ a 2⁻⁸ (0.5 a 0.00390625)</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">3.</span>
+          <span class="step-lbl">Variación en &Delta;t = h:</span>
+          <span class="step-val" id="e2-m3" style="color:#fca5a5">-</span>
+        </div>
+      </div>
+
+      <div class="anim-box" style="margin-top:10px">
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Paso <i>t</i> (B3):</div>
+          <div class="bit-cells" id="e2-bits-t"></div>
+          <span class="code" id="e2-hex-t" style="margin-left:10px">-</span>
+        </div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Paso <i>t</i>+<i>h</i> (B3):</div>
+          <div class="bit-cells" id="e2-bits-next"></div>
+          <span class="code" id="e2-hex-next" style="margin-left:10px">-</span>
+        </div>
+        <div style="color:var(--e2); font-size:11px; margin-top:8px" id="e2-diff-text"></div>
+      </div>
+
+      <div class="result">
+        <div class="resultbyte" id="e2-res" style="border-color:var(--e2); color:var(--e2)">-</div>
+        <span class="status-badge badge-fail">FALLA MASIVA NIST (Runs / FFT = 0/100)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= E3 ================= -->
+  <section class="method" id="e3">
+    <span class="eyebrow" style="background:var(--e3-bg); color:var(--e3)"><span class="dot" style="background:var(--e3)"></span>E3: XOR-Fold de 64 bits de <i>X</i><sub><i>n</i></sub></span>
+    <h2 class="mtitle">Plegado Monovariable por Suma Módulo 2 sin Acarreo</h2>
+    <p class="note">Fusión bit a bit de los 8 bytes que componen la palabra de 64 bits de <i>X</i><sub><i>n</i></sub>.</p>
+    <div class="formula"><i>K</i><sub><i>n</i></sub> = B<sub>7</sub> &oplus; B<sub>6</sub> &oplus; B<sub>5</sub> &oplus; B<sub>4</sub> &oplus; B<sub>3</sub> &oplus; B<sub>2</sub> &oplus; B<sub>1</sub> &oplus; B<sub>0</sub></div>
+
+    <div class="panel">
+      <div class="rowhead">
+        <span class="formulaval" id="e3-val"><i>X</i><sub><i>n</i></sub>: -</span>
+        <div class="btnrow">
+          <button onclick="E3.play()">Calcular XOR Columna por Columna</button>
+          <button onclick="E3.newVal()">Nuevo <i>X</i><sub><i>n</i></sub></button>
+        </div>
+      </div>
+
+      <div class="register" id="e3-reg"></div>
+
+      <div class="math-card">
+        <div class="math-step">
+          <span class="step-num">1.</span>
+          <span class="step-lbl">Fórmula por cada bit <i>k</i>:</span>
+          <span class="step-val">Bit<sub><i>k</i></sub>(<i>K</i><sub><i>n</i></sub>) = B<sub>7</sub>[<i>k</i>] &oplus; B<sub>6</sub>[<i>k</i>] &oplus; &hellip; &oplus; B<sub>0</sub>[<i>k</i>]</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">2.</span>
+          <span class="step-lbl">Efecto de mezcla:</span>
+          <span class="step-val" style="color:var(--e3)">El micro-caos de B<sub>0</sub> enmascara los octetos deterministas B<sub>7</sub>..B<sub>3</sub></span>
+        </div>
+      </div>
+
+      <div class="anim-box" id="e3-matrix" style="overflow-x:auto; margin-top:10px"></div>
+
+      <div class="result">
+        <div class="resultbyte" id="e3-res" style="border-color:var(--e3); color:var(--e3)">-</div>
+        <span class="status-badge badge-pass">PASA NIST (100% de Aprobación)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= E4 ================= -->
+  <section class="method" id="e4">
+    <span class="eyebrow" style="background:var(--e4-bg); color:var(--e4)"><span class="dot" style="background:var(--e4)"></span>E4: Fusión Espacial Tridimensional (192 Bits)</span>
+    <h2 class="mtitle">Combinación Multivariada Directa de los Tres Estados Dinámicos</h2>
+    <p class="note">Plegado individual de cada eje y superposición espacial bit a bit.</p>
+    <div class="formula"><i>K</i><sub><i>n</i></sub> = Fold(<i>X</i><sub><i>n</i></sub>) &oplus; Fold(<i>Y</i><sub><i>n</i></sub>) &oplus; Fold(<i>Z</i><sub><i>n</i></sub>)</div>
+
+    <div class="panel">
+      <div class="rowhead">
+        <span class="formulaval" id="e4-val"><i>X</i><sub><i>n</i></sub>, <i>Y</i><sub><i>n</i></sub>, <i>Z</i><sub><i>n</i></sub>: -</span>
+        <div class="btnrow">
+          <button onclick="E4.play()">Calcular Fusión 3D</button>
+          <button onclick="E4.newVal()">Nuevos Estados</button>
+        </div>
+      </div>
+
+      <div class="math-card">
+        <div class="math-step">
+          <span class="step-num">1.</span>
+          <span class="step-lbl">Total de bits de entrada:</span>
+          <span class="step-val">192 bits (3 coordenadas acopladas de 64 bits)</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">2.</span>
+          <span class="step-lbl">Plegados individuales:</span>
+          <span class="step-val" id="e4-m2" style="color:var(--e4)">-</span>
+        </div>
+        <div class="math-step">
+          <span class="step-num">3.</span>
+          <span class="step-lbl">Operación tridimensional:</span>
+          <span class="step-val" id="e4-m3">-</span>
+        </div>
+      </div>
+
+      <div class="anim-box" style="margin-top:10px">
+        <div class="bit-stream-row">
+          <div class="bit-stream-label"><i>F</i><sub><i>X</i></sub> = Fold(<i>X</i><sub><i>n</i></sub>):</div>
+          <div class="bit-cells" id="e4-bits-x"></div>
+          <span class="code" id="e4-hex-x" style="margin-left:10px">-</span>
+        </div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label"><i>F</i><sub><i>Y</i></sub> = Fold(<i>Y</i><sub><i>n</i></sub>):</div>
+          <div class="bit-cells" id="e4-bits-y"></div>
+          <span class="code" id="e4-hex-y" style="margin-left:10px">-</span>
+        </div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label"><i>F</i><sub><i>Z</i></sub> = Fold(<i>Z</i><sub><i>n</i></sub>):</div>
+          <div class="bit-cells" id="e4-bits-z"></div>
+          <span class="code" id="e4-hex-z" style="margin-left:10px">-</span>
+        </div>
+        <div style="height:1px; background:var(--border); margin:6px 0"></div>
+        <div class="bit-stream-row">
+          <div class="bit-stream-label">Salida <i>K</i><sub><i>n</i></sub>:</div>
+          <div class="bit-cells" id="e4-bits-out"></div>
+        </div>
+      </div>
+
+      <div class="result">
+        <div class="resultbyte" id="e4-res" style="border-color:var(--e4); color:var(--e4)">-</div>
+        <span class="status-badge badge-pass">MÁXIMA CALIDAD NIST (>99.4%)</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const MASK64 = (1n << 64n) - 1n;
+const MASK8 = 0xFFn;
+
+function toQ3232(real){
+  return BigInt(Math.round(real * 4294967296)) & MASK64;
+}
+function getByte(bits, i){ return Number((bits >> BigInt(8*i)) & MASK8); }
+function foldByte(bits){
+  let acc = 0;
+  for(let i=0;i<8;i++) acc ^= getByte(bits,i);
+  return acc;
+}
+function hex2(n){ return n.toString(16).padStart(2,'0').toUpperCase(); }
+function bin8(n){ return n.toString(2).padStart(8,'0'); }
+
+function renderReg(id, bits, activeIdx, color){
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for(let i=7; i>=0; i--){
+    const b = getByte(bits, i);
+    const d = document.createElement('div');
+    d.className = 'byte';
+    d.innerHTML = `<span class="idx">B${i}</span><span class="hex">${hex2(b)}</span>`;
+    if(activeIdx && activeIdx.includes(i)){
+      d.style.borderColor = color;
+      d.style.background = color + '22';
+      d.style.color = color;
+    }
+    el.appendChild(d);
+  }
+}
+
+function renderBitCells(id, byteVal, hiClass="active-hi"){
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  const s = bin8(byteVal);
+  for(const bit of s){
+    const c = document.createElement('div');
+    c.className = `bit-cell ${bit==='1'? hiClass : 'dim'}`;
+    c.textContent = bit;
+    el.appendChild(c);
+  }
+}
+
+/* ---------------- E0 LOGIC ---------------- */
+const E0 = (function(){
+  let X = 0;
+  function newVal(){
+    X = (Math.random()*4 + 0.5) * (Math.random()>0.5? 1 : -1);
+    document.getElementById('e0-val').innerHTML = `Estado analógico <i>X</i><sub><i>n</i></sub> = ${X.toFixed(10)}`;
+    document.getElementById('e0-m1').textContent = Math.abs(X).toFixed(12);
+    document.getElementById('e0-m2').textContent = '-';
+    document.getElementById('e0-m3').textContent = '-';
+    document.getElementById('e0-m4').textContent = '-';
+    document.getElementById('e0-res').textContent = '-';
+    document.getElementById('e0-bits').innerHTML = '';
+  }
+  function play(){
+    const absX = Math.abs(X);
+    const scaled = absX * 1e13;
+    const floored = Math.floor(scaled);
+    const byte = floored % 256;
+    
+    document.getElementById('e0-m2').textContent = `${absX.toFixed(8)} &times; 10¹³ = ${scaled.toFixed(2)}`;
+    setTimeout(() => {
+      document.getElementById('e0-m3').textContent = `floor(${scaled.toFixed(2)}) = ${floored}`;
+    }, 300);
+    setTimeout(() => {
+      document.getElementById('e0-m4').textContent = `${floored} mod 256 = ${byte} (0x${hex2(byte)})`;
+      document.getElementById('e0-res').textContent = hex2(byte);
+      renderBitCells('e0-bits', byte);
+    }, 600);
+  }
+  return { newVal, play };
+})();
+
+/* ---------------- E1 LOGIC ---------------- */
+const E1 = (function(){
+  let bits;
+  function newVal(){
+    const X = Math.random()*8 - 4;
+    bits = toQ3232(X);
+    document.getElementById('e1-val').innerHTML = `<i>X</i><sub><i>n</i></sub> = ${X.toFixed(6)} | Q32.32: 0x${bits.toString(16).padStart(16,'0').toUpperCase()}`;
+    renderReg('e1-reg', bits, [0], 'var(--e1)');
+    document.getElementById('e1-m1').textContent = `0x${bits.toString(16).padStart(16,'0').toUpperCase()}`;
+    const b0 = getByte(bits, 0);
+    renderBitCells('e1-src-bits', b0);
+    renderBitCells('e1-mask-bits', 0xFF);
+    document.getElementById('e1-out-bits').innerHTML = '';
+    document.getElementById('e1-res').textContent = '-';
+  }
+  function play(){
+    const b0 = getByte(bits, 0);
+    renderBitCells('e1-out-bits', b0);
+    document.getElementById('e1-res').textContent = hex2(b0);
+  }
+  return { newVal, play };
+})();
+
+/* ---------------- E2 LOGIC ---------------- */
+const E2 = (function(){
+  let bitsT, bitsNext, XT, XNext;
+  function newVal(){
+    XT = Math.random()*6 + 1.2;
+    XNext = XT + 0.00784; // avance analógico con paso h=0.01
+    bitsT = toQ3232(XT);
+    bitsNext = toQ3232(XNext);
+    document.getElementById('e2-val').innerHTML = `<i>t</i>: ${XT.toFixed(5)} &rarr; <i>t</i>+<i>h</i>: ${XNext.toFixed(5)}`;
+    renderReg('e2-reg', bitsT, [3], 'var(--e2)');
+    const b3T = getByte(bitsT, 3);
+    const b3Next = getByte(bitsNext, 3);
+    renderBitCells('e2-bits-t', b3T, 'active-err');
+    renderBitCells('e2-bits-next', b3Next, 'active-err');
+    document.getElementById('e2-hex-t').textContent = `0x${hex2(b3T)}`;
+    document.getElementById('e2-hex-next').textContent = `0x${hex2(b3Next)}`;
+    document.getElementById('e2-m3').textContent = `&Delta;<i>X</i> = ${(XNext - XT).toFixed(5)} (el macro-estado apenas cambia)`;
+    document.getElementById('e2-diff-text').textContent = '';
+    document.getElementById('e2-res').textContent = hex2(b3T);
+  }
+  function play(){
+    const b3T = getByte(bitsT, 3);
+    const b3Next = getByte(bitsNext, 3);
+    const diff = (b3T ^ b3Next).toString(2).replace(/0/g,'').length;
+    document.getElementById('e2-diff-text').innerHTML = 
+      `¡Falla Determinista! De los 8 bits del byte superior, solo cambiaron ${diff} bit(s) entre pasos sucesivos. Esto produce secuencias cuasi-estáticas que reprueban Runs, FFT y Approximate Entropy en NIST.`;
+  }
+  return { newVal, play };
+})();
+
+/* ---------------- E3 LOGIC ---------------- */
+const E3 = (function(){
+  let bits;
+  function newVal(){
+    const X = Math.random()*10 - 5;
+    bits = toQ3232(X);
+    document.getElementById('e3-val').innerHTML = `<i>X</i><sub><i>n</i></sub> = ${X.toFixed(6)}`;
+    renderReg('e3-reg', bits, [0,1,2,3,4,5,6,7], 'var(--e3)');
+    const m = document.getElementById('e3-matrix');
+    m.innerHTML = '';
+    for(let i=7; i>=0; i--){
+      const b = getByte(bits, i);
+      const row = document.createElement('div');
+      row.className = 'bit-stream-row';
+      row.innerHTML = `<div class="bit-stream-label">B<sub>${i}</sub> (0x${hex2(b)}):</div><div class="bit-cells" id="e3-row-${i}"></div>`;
+      m.appendChild(row);
+      renderBitCells(`e3-row-${i}`, b);
+    }
+    document.getElementById('e3-res').textContent = '-';
+  }
+  function play(){
+    const acc = foldByte(bits);
+    document.getElementById('e3-res').textContent = hex2(acc);
+    for(let i=0; i<8; i++){
+      document.getElementById(`e3-row-${i}`).querySelectorAll('.bit-cell').forEach(c => {
+        c.style.borderColor = 'var(--e3)';
+      });
+    }
+  }
+  return { newVal, play };
+})();
+
+/* ---------------- E4 LOGIC ---------------- */
+const E4 = (function(){
+  let bx, by, bz;
+  function newVal(){
+    const X = Math.random()*4, Y = Math.random()*4, Z = Math.random()*20;
+    bx = toQ3232(X); by = toQ3232(Y); bz = toQ3232(Z);
+    document.getElementById('e4-val').innerHTML = `<i>X</i><sub><i>n</i></sub>=${X.toFixed(3)}, <i>Y</i><sub><i>n</i></sub>=${Y.toFixed(3)}, <i>Z</i><sub><i>n</i></sub>=${Z.toFixed(3)}`;
+    const fx = foldByte(bx), fy = foldByte(by), fz = foldByte(bz);
+    renderBitCells('e4-bits-x', fx);
+    renderBitCells('e4-bits-y', fy);
+    renderBitCells('e4-bits-z', fz);
+    document.getElementById('e4-hex-x').textContent = `0x${hex2(fx)}`;
+    document.getElementById('e4-hex-y').textContent = `0x${hex2(fy)}`;
+    document.getElementById('e4-hex-z').textContent = `0x${hex2(fz)}`;
+    document.getElementById('e4-m2').innerHTML = `<i>F</i><sub><i>X</i></sub>=0x${hex2(fx)}, <i>F</i><sub><i>Y</i></sub>=0x${hex2(fy)}, <i>F</i><sub><i>Z</i></sub>=0x${hex2(fz)}`;
+    document.getElementById('e4-m3').innerHTML = `0x${hex2(fx)} &oplus; 0x${hex2(fy)} &oplus; 0x${hex2(fz)} = 0x${hex2(fx ^ fy ^ fz)}`;
+    document.getElementById('e4-bits-out').innerHTML = '';
+    document.getElementById('e4-res').textContent = '-';
+  }
+  function play(){
+    const fx = foldByte(bx), fy = foldByte(by), fz = foldByte(bz);
+    const k = fx ^ fy ^ fz;
+    renderBitCells('e4-bits-out', k, 'active-hi');
+    document.getElementById('e4-res').textContent = hex2(k);
+  }
+  return { newVal, play };
+})();
+
+// Inicialización automática
+E0.newVal(); E1.newVal(); E2.newVal(); E3.newVal(); E4.newVal();
+</script>
+</body>
+</html>
